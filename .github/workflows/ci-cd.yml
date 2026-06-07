@@ -53,7 +53,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH }}
+            cd /var/www/wa-ai-tera
             git pull --ff-only
             docker compose up -d --build
             docker image prune -f

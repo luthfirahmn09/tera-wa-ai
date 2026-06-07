@@ -16,8 +16,10 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 | `SSH_HOST` | ✅ | IP / domain server, mis. `203.0.113.10` |
 | `SSH_USER` | ✅ | user SSH, mis. `deploy` atau `root` |
 | `SSH_KEY` | ✅ | **private key** SSH (isi file, bukan path) |
-| `DEPLOY_PATH` | ✅ | folder repo di server, mis. `/home/deploy/wa-ai-order` |
 | `SSH_PORT` | opsional | default `22` |
+
+> Path deploy sudah di-hardcode di workflow: **`/var/www/wa-ai-tera`** (bukan secret).
+> Kalau pindah folder, ubah di [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml).
 
 Bikin keypair (kalau belum):
 ```bash
@@ -32,9 +34,9 @@ ssh-keygen -t ed25519 -C "github-deploy" -f deploy_key
 
 ```bash
 # 1. Docker + Docker Compose plugin terpasang
-# 2. clone repo ke DEPLOY_PATH
-git clone <url-repo> /home/deploy/wa-ai-order
-cd /home/deploy/wa-ai-order
+# 2. clone repo ke path deploy
+git clone <url-repo> /var/www/wa-ai-tera
+cd /var/www/wa-ai-tera
 
 # 3. siapkan .env (TIDAK ikut git — berisi secret)
 cp .env.example .env
@@ -54,7 +56,7 @@ docker compose up -d --build
 ```
 git push origin main
    └─ GitHub Actions: CI (lint + build) ─► CD (SSH ke server)
-        └─ cd DEPLOY_PATH && git pull && docker compose up -d --build
+        └─ cd /var/www/wa-ai-tera && git pull && docker compose up -d --build
 ```
 
 Pantau hasilnya di tab **Actions** repo GitHub.
