@@ -1,0 +1,5 @@
+node_modules/
+.env
+session/
+_IGNORE_*
+*.data.json

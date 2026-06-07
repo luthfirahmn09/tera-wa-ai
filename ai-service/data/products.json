@@ -1,0 +1,98 @@
+[
+  {
+    "id": "p001",
+    "nama": "Gamis Syari Premium",
+    "kategori": "gamis",
+    "harga": 49000,
+    "deskripsi": "Gamis muslim wanita, bahan adem, potongan longgar dan syari",
+    "link": "https://toko.example.com/p/p001"
+  },
+  {
+    "id": "p002",
+    "nama": "Gamis Katun Polos",
+    "kategori": "gamis",
+    "harga": 55000,
+    "deskripsi": "Gamis simpel harian, bahan katun premium, nyaman dipakai",
+    "link": "https://toko.example.com/p/p002"
+  },
+  {
+    "id": "p003",
+    "nama": "Gamis Motif Bunga",
+    "kategori": "gamis",
+    "harga": 45000,
+    "deskripsi": "Gamis wanita motif bunga, cocok untuk acara santai",
+    "link": "https://toko.example.com/p/p003"
+  },
+  {
+    "id": "p004",
+    "nama": "Kemeja Flanel Pria",
+    "kategori": "kemeja",
+    "harga": 75000,
+    "deskripsi": "Kemeja flanel pria lengan panjang, bahan tebal hangat",
+    "link": "https://toko.example.com/p/p004"
+  },
+  {
+    "id": "p005",
+    "nama": "Kemeja Putih Formal",
+    "kategori": "kemeja",
+    "harga": 90000,
+    "deskripsi": "Kemeja putih pria formal untuk kerja dan kondangan",
+    "link": "https://toko.example.com/p/p005"
+  },
+  {
+    "id": "p006",
+    "nama": "Kaos Polos Cotton Combed",
+    "kategori": "kaos",
+    "harga": 35000,
+    "deskripsi": "Kaos polos unisex bahan cotton combed 30s, adem",
+    "link": "https://toko.example.com/p/p006"
+  },
+  {
+    "id": "p007",
+    "nama": "Kaos Oversize Distro",
+    "kategori": "kaos",
+    "harga": 48000,
+    "deskripsi": "Kaos oversize anak muda gaya distro, sablon premium",
+    "link": "https://toko.example.com/p/p007"
+  },
+  {
+    "id": "p008",
+    "nama": "Celana Jeans Slim Fit",
+    "kategori": "celana",
+    "harga": 120000,
+    "deskripsi": "Celana jeans pria slim fit, bahan denim stretch",
+    "link": "https://toko.example.com/p/p008"
+  },
+  {
+    "id": "p009",
+    "nama": "Celana Jogger Pria",
+    "kategori": "celana",
+    "harga": 65000,
+    "deskripsi": "Celana jogger santai, bahan fleece lembut, ada saku",
+    "link": "https://toko.example.com/p/p009"
+  },
+  {
+    "id": "p010",
+    "nama": "Hijab Pashmina Ceruti",
+    "kategori": "hijab",
+    "harga": 30000,
+    "deskripsi": "Hijab pashmina bahan ceruti babydoll, jatuh dan adem",
+    "link": "https://toko.example.com/p/p010"
+  },
+  {
+    "id": "p011",
+    "nama": "Hijab Segi Empat Voal",
+    "kategori": "hijab",
+    "harga": 28000,
+    "deskripsi": "Hijab segi empat bahan voal premium motif polos",
+    "link": "https://toko.example.com/p/p011"
+  },
+  {
+    "id": "p012",
+    "nama": "Jaket Hoodie Polos",
+    "kategori": "jaket",
+    "harga": 95000,
+    "deskripsi": "Jaket hoodie unisex bahan fleece tebal, hangat untuk daerah dingin",
+    "link": "https://toko.example.com/p/p012"
+  }
+]

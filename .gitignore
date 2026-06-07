@@ -1,0 +1,43 @@
+# ===== Secrets / config lokal =====
+.env
+*.env
+!.env.example
+
+# ===== Python (ai-service) =====
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# ===== Node (wa-gateway) =====
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ===== Sesi WhatsApp (Baileys) + sisa open-wa lama =====
+wa-gateway/session/
+wa-gateway/baileys_auth/
+wa-gateway/_IGNORE_*
+wa-gateway/*.data.json
+session.data.json
+
+# ===== Cache model embedding (fastembed) =====
+.cache/
+fastembed_cache/
+**/.cache/fastembed/
+
+# ===== Data lokal (kalau jalan tanpa Docker volume) =====
+qdrant_storage/
+redis_data/
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+*.swp
+*.log
+.idea/
+.vscode/

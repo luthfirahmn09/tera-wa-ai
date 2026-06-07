@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokoEko — Monitor Chat</title>
+  <style>
+    :root { --green:#128C7E; --green-d:#075E54; --me:#DCF8C6; --bg:#ECE5DD; }
+    * { box-sizing:border-box; }
+    body { margin:0; height:100vh; display:flex; flex-direction:column;
+           font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+           background:#d9d2c9; color:#222; }
+    header { background:var(--green-d); color:#fff; padding:10px 16px; display:flex;
+             align-items:center; gap:14px; flex-wrap:wrap; }
+    header h1 { font-size:16px; margin:0; font-weight:600; }
+    header .stats { font-size:12px; opacity:.85; }
+    header input { margin-left:auto; padding:5px 8px; border:none; border-radius:6px;
+             font-size:12px; width:140px; }
+    .wrap { flex:1; display:flex; min-height:0; }
+    .list { width:260px; background:#fff; border-right:1px solid #ddd; overflow-y:auto; }
+    .conv { padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; }
+    .conv:hover { background:#f5f5f5; }
+    .conv.active { background:#e7f4f1; }
+    .conv .num { font-weight:600; font-size:14px; }
+    .conv .prev { font-size:12px; color:#777; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis; margin-top:2px; }
+    .conv .time { float:right; font-size:10px; color:#999; }
+    .thread { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column;
+             gap:8px; background:var(--bg); }
+    .thread .who { text-align:center; font-size:12px; color:#555; margin-bottom:6px; }
+    .msg { max-width:75%; padding:7px 11px; border-radius:8px; font-size:14px;
+           line-height:1.4; white-space:pre-wrap; word-wrap:break-word;
+           box-shadow:0 1px 1px rgba(0,0,0,.08); }
+    .msg.user { align-self:flex-end; background:var(--me); border-top-right-radius:2px; }
+    .msg.bot  { align-self:flex-start; background:#fff; border-top-left-radius:2px; }
+    .msg .t { display:block; font-size:9px; color:#999; margin-top:3px; text-align:right; }
+    .empty { margin:auto; color:#888; font-size:14px; }
+    a.q { color:#cfe; font-size:12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 TokoEko — Monitor Chat</h1>
+    <span class="stats" id="stats">memuat…</span>
+    <input id="token" placeholder="admin token" title="X-Admin-Token" />
+  </header>
+  <div class="wrap">
+    <div class="list" id="list"></div>
+    <div class="thread" id="thread"><div class="empty">Pilih percakapan di kiri</div></div>
+  </div>
+
+  <script>
+    const tokenEl = document.getElementById('token');
+    tokenEl.value = localStorage.getItem('admin_token') || '';
+    tokenEl.addEventListener('change', () => {
+      localStorage.setItem('admin_token', tokenEl.value.trim());
+      sig = null; tick();
+    });
+
+    let selected = null;
+    let sig = null; // signature data terakhir (biar nggak re-render percuma)
+
+    function cleanNum(u) {
+      return (u || '').replace(/@s\.whatsapp\.net$/, '').replace(/@c\.us$/, '');
+    }
+    function fmtTime(ts) {
+      const d = new Date(ts * 1000);
+      return d.toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit',
+        day:'2-digit', month:'2-digit' });
+    }
+    function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function fmt(s){
+      return esc(s).replace(/\*([^*\n]+)\*/g,'<b>$1</b>')
+                   .replace(/\bhttps?:\/\/[^\s]+/g, u=>'<a href="'+u+'" target="_blank">'+u+'</a>');
+    }
+
+    // ubah list entri {ts,user,text,reply} -> map user -> {msgs[], last}
+    function group(chats) {
+      const m = new Map();
+      // chats datang terbaru-dulu; balik biar kronologis
+      for (const c of [...chats].reverse()) {
+        if (!m.has(c.user)) m.set(c.user, { user:c.user, msgs:[], last:0 });
+        const g = m.get(c.user);
+        g.msgs.push({ role:'user', text:c.text, ts:c.ts });
+        g.msgs.push({ role:'bot', text:c.reply, ts:c.ts });
+        g.last = Math.max(g.last, c.ts);
+      }
+      return [...m.values()].sort((a,b) => b.last - a.last);
+    }
+
+    function renderList(groups) {
+      const el = document.getElementById('list');
+      if (!groups.length) { el.innerHTML = '<div class="empty" style="padding:16px">Belum ada chat.</div>'; return; }
+      el.innerHTML = groups.map(g => {
+        const lastMsg = g.msgs[g.msgs.length - 2] || g.msgs[g.msgs.length - 1];
+        const active = g.user === selected ? ' active' : '';
+        return '<div class="conv'+active+'" data-u="'+encodeURIComponent(g.user)+'">'+
+          '<span class="time">'+fmtTime(g.last)+'</span>'+
+          '<div class="num">'+esc(cleanNum(g.user))+'</div>'+
+          '<div class="prev">'+esc((lastMsg?lastMsg.text:'').slice(0,40))+'</div></div>';
+      }).join('');
+      el.querySelectorAll('.conv').forEach(c => c.addEventListener('click', () => {
+        selected = decodeURIComponent(c.dataset.u);
+        renderList(groups); renderThread(groups);
+      }));
+    }
+
+    function renderThread(groups) {
+      const el = document.getElementById('thread');
+      const g = groups.find(x => x.user === selected);
+      if (!g) { el.innerHTML = '<div class="empty">Pilih percakapan di kiri</div>'; return; }
+      el.innerHTML = '<div class="who">'+esc(cleanNum(g.user))+'</div>' +
+        g.msgs.map(m => '<div class="msg '+m.role+'">'+fmt(m.text)+
+          '<span class="t">'+fmtTime(m.ts)+'</span></div>').join('');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch('/admin/chats?limit=400', {
+          headers: { 'X-Admin-Token': tokenEl.value.trim() }, cache:'no-store'
+        });
+        if (res.status === 401 || res.status === 404) {
+          document.getElementById('stats').textContent = '🔒 isi admin token di kanan atas';
+          return;
+        }
+        const data = await res.json();
+        const chats = data.chats || [];
+        const newSig = chats.length + ':' + (chats[0]?.ts || 0);
+        if (newSig === sig) return; // tidak ada perubahan
+        sig = newSig;
+        const groups = group(chats);
+        const users = new Set(chats.map(c => c.user));
+        document.getElementById('stats').textContent =
+          chats.length + ' pesan · ' + users.size + ' orang';
+        if (!selected && groups.length) selected = groups[0].user;
+        renderList(groups); renderThread(groups);
+      } catch (e) {
+        document.getElementById('stats').textContent = '⚠️ gagal konek';
+      }
+    }
+    tick(); setInterval(tick, 4000);
+  </script>
+</body>
+</html>

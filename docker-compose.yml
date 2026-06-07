@@ -1,0 +1,60 @@
+services:
+  # Skema port host: 6001 ai-service · 6002 wa-gateway · 6003 qdrant · 6004 redis
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6003:6333"   # host 6003 -> container 6333 (port internal qdrant fix)
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6004:6379"   # host 6004 -> container 6379
+    volumes:
+      - redis_data:/data
+
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # override nilai di .env supaya pakai nama service docker (port internal)
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+      - EMBEDDING_CACHE_DIR=/root/.cache/fastembed
+    ports:
+      - "6001:6001"   # API + UI: http://localhost:6001
+    depends_on:
+      - qdrant
+      - redis
+    volumes:
+      # cache model embedding supaya tidak download ulang tiap restart
+      - model_cache:/root/.cache/fastembed
+
+  wa-gateway:
+    build: ./wa-gateway
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - AI_SERVICE_URL=http://ai-service:6001
+      - SESSION_PATH=/app/session
+      - QR_PORT=6002
+    ports:
+      - "6002:6002"   # halaman scan QR: http://localhost:6002/qr
+    depends_on:
+      - ai-service
+    volumes:
+      # simpan sesi WhatsApp supaya tidak scan QR ulang
+      - wa_session:/app/session
+    # perlu agar QR code muncul & bisa dilihat lewat `docker compose logs -f wa-gateway`
+    tty: true
+    stdin_open: true
+
+volumes:
+  qdrant_storage:
+  redis_data:
+  model_cache:
+  wa_session:

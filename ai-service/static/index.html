@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokoEko — Test Chat</title>
+  <style>
+    :root { --green:#128C7E; --green-d:#075E54; --bubble-me:#DCF8C6; --bg:#ECE5DD; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+           background:#d9d2c9; display:flex; justify-content:center; }
+    .app { width:100%; max-width:480px; height:100vh; display:flex; flex-direction:column;
+           background:var(--bg); box-shadow:0 0 20px rgba(0,0,0,.15); }
+    header { background:var(--green-d); color:#fff; padding:10px 14px; display:flex;
+             align-items:center; gap:10px; }
+    header .avatar { width:38px; height:38px; border-radius:50%; background:var(--green);
+             display:flex; align-items:center; justify-content:center; font-weight:700; }
+    header .title { font-weight:600; line-height:1.1; }
+    header .title small { font-weight:400; opacity:.8; font-size:11px; }
+    .bar { background:#f7f7f7; padding:8px 10px; display:flex; gap:6px; align-items:center;
+           border-bottom:1px solid #e0e0e0; font-size:13px; }
+    .bar label { color:#555; }
+    .bar input { flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:6px; font-size:13px; }
+    #chat { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; }
+    .msg { max-width:80%; padding:8px 11px; border-radius:8px; font-size:14px; line-height:1.4;
+           white-space:pre-wrap; word-wrap:break-word; box-shadow:0 1px 1px rgba(0,0,0,.1); }
+    .me  { align-self:flex-end; background:var(--bubble-me); border-top-right-radius:2px; }
+    .bot { align-self:flex-start; background:#fff; border-top-left-radius:2px; }
+    .msg a { color:#039be5; }
+    .meta { font-size:10px; color:#888; margin-top:3px; text-align:right; }
+    .typing { align-self:flex-start; color:#888; font-size:13px; font-style:italic; padding:4px 6px; }
+    .quick { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px; background:#f7f7f7;
+             border-top:1px solid #e0e0e0; }
+    .quick button { font-size:12px; padding:5px 9px; border:1px solid #cfcfcf; background:#fff;
+             border-radius:14px; cursor:pointer; }
+    .quick button:hover { background:#eee; }
+    form { display:flex; gap:8px; padding:10px; background:#f0f0f0; }
+    #text { flex:1; padding:10px 12px; border:1px solid #ccc; border-radius:20px; font-size:14px; }
+    #send { width:44px; height:44px; border:none; border-radius:50%; background:var(--green);
+            color:#fff; font-size:18px; cursor:pointer; }
+    #send:disabled { opacity:.5; cursor:default; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="avatar">TE</div>
+      <div class="title">TokoEko<br /><small>bot test chat</small></div>
+    </header>
+
+    <div class="bar">
+      <label>No:</label>
+      <input id="from" value="628111" title="nomor pengirim (identitas keranjang/memory)" />
+      <label>API:</label>
+      <input id="api" placeholder="http://localhost:6001" />
+    </div>
+
+    <div id="chat"></div>
+
+    <div class="quick">
+      <button>cari gamis harga 50rb</button>
+      <button>yang paling murah aja</button>
+      <button>simpan no 1</button>
+      <button>keranjang saya</button>
+      <button>bayar</button>
+      <button>kosongkan keranjang</button>
+      <button>gimana cara order</button>
+    </div>
+
+    <form id="form">
+      <input id="text" placeholder="Ketik pesan..." autocomplete="off" />
+      <button id="send" type="submit">➤</button>
+    </form>
+  </div>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const textEl = document.getElementById('text');
+    const fromEl = document.getElementById('from');
+    const apiEl = document.getElementById('api');
+    const sendBtn = document.getElementById('send');
+
+    // kalau dibuka via http (di-serve FastAPI) pakai origin; kalau file:// pakai localhost
+    apiEl.value = location.protocol.startsWith('http') ? location.origin : 'http://localhost:6001';
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    // render markdown WA sederhana: *bold*, newline, link
+    function render(text) {
+      let h = escapeHtml(text);
+      h = h.replace(/\bhttps?:\/\/[^\s]+/g, (u) => `<a href="${u}" target="_blank">${u}</a>`);
+      h = h.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
+      return h;
+    }
+    function addMsg(text, who) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + who;
+      div.innerHTML = render(text);
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    async function sendMessage(text) {
+      addMsg(text, 'me');
+      sendBtn.disabled = true;
+      const typing = document.createElement('div');
+      typing.className = 'typing';
+      typing.textContent = 'mengetik…';
+      chat.appendChild(typing);
+      chat.scrollTop = chat.scrollHeight;
+
+      try {
+        const base = (apiEl.value || 'http://localhost:6001').replace(/\/$/, '');
+        const res = await fetch(base + '/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from_: fromEl.value || 'web', text }),
+        });
+        typing.remove();
+        if (!res.ok) { addMsg('⚠️ Error ' + res.status, 'bot'); return; }
+        const data = await res.json();
+        addMsg(data.reply || '(balasan kosong)', 'bot');
+      } catch (err) {
+        typing.remove();
+        addMsg('⚠️ Gagal konek ke API: ' + err.message + '\nPastikan ai-service jalan & URL API benar.', 'bot');
+      } finally {
+        sendBtn.disabled = false;
+        textEl.focus();
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = textEl.value.trim();
+      if (!t) return;
+      textEl.value = '';
+      sendMessage(t);
+    });
+
+    document.querySelectorAll('.quick button').forEach((b) => {
+      b.addEventListener('click', () => sendMessage(b.textContent));
+    });
+
+    addMsg('👋 Selamat datang di test chat TokoEko.\nKetik pesan atau pakai tombol cepat di bawah.', 'bot');
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # ---------- CI: lint + validasi + build image ----------
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cek syntax Python (ai-service)
+        run: python -m py_compile ai-service/*.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cek syntax Node (wa-gateway)
+        run: node --check wa-gateway/index.js
+
+      - name: Validasi docker-compose
+        run: |
+          cp .env.example .env
+          docker compose config -q
+
+      - name: Build image (ai-service + wa-gateway)
+        run: docker compose build
+
+  # ---------- CD: deploy ke server lewat SSH ----------
+  deploy:
+    needs: ci
+    # hanya deploy saat push ke main/master (bukan pull request)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull --ff-only
+            docker compose up -d --build
+            docker image prune -f
