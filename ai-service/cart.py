@@ -85,6 +85,18 @@ def set_search(user: str, product_ids: list[str]) -> None:
     )
 
 
+def reset_search(user: str) -> bool:
+    """Balikin offset paginasi ke 0 (buat 'kirim ulang katalog'). False kalau
+    belum ada pencarian tersimpan."""
+    raw = _r().get(_search_key(user))
+    if not raw:
+        return False
+    st = json.loads(raw)
+    st["offset"] = 0
+    _r().set(_search_key(user), json.dumps(st), ex=_LIST_TTL)
+    return True
+
+
 def next_search_page(user: str, page_size: int) -> tuple[list[str], int]:
     """Ambil batch berikutnya dari hasil pencarian tersimpan.
 

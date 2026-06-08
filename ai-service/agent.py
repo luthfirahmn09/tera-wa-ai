@@ -27,10 +27,11 @@ from cart import (
     get_last_list,
     next_search_page,
     remove_from_cart,
+    reset_search,
     set_last_list,
     set_search,
 )
-from catalog import find_by_name, get_categories, get_product
+from catalog import all_products, find_by_name, get_categories, get_product
 from config import (
     GROQ_FALLBACK_MODELS,
     GROQ_MODEL,
@@ -343,6 +344,50 @@ def _do_more(user: str) -> list[str]:
     return _render_page(_pick(_LEAD_MORE, str(remaining)), batch, remaining, user)
 
 
+def _do_resend(user: str) -> list[str]:
+    """'kirim ulang katalog' -> tampilkan lagi hasil pencarian dari halaman 1."""
+    if not reset_search(user):
+        return [
+            "Belum ada katalog yang bisa dikirim ulang 🙏 "
+            "Cari dulu ya, misal *cari gamis*."
+        ]
+    batch, remaining = next_search_page(user, PAGE_SIZE)
+    if not batch:
+        return ["Belum ada katalog 🙏 Cari dulu ya, misal *cari gamis*."]
+    return _render_page("Ini lagi katalognya 👇", batch, remaining, user)
+
+
+def _ref_list_from_quoted(quoted: str) -> list[str]:
+    """Kalau user me-reply pesan berisi produk, ambil daftar produk dari LINK di
+    pesan itu (urut sesuai aslinya) supaya 'no 3' / nama tetap merujuk ke situ."""
+    if not quoted:
+        return []
+    links = re.findall(r"https?://\S+", quoted)
+    if not links:
+        return []
+    by_link = {p.get("link", ""): p["id"] for p in all_products() if p.get("link")}
+    ids: list[str] = []
+    for raw in links:
+        link = raw.rstrip(").,>\"'")
+        pid = by_link.get(link)
+        if pid and pid not in ids:
+            ids.append(pid)
+    return ids
+
+
+def _bare_number_refs(text: str) -> list[str]:
+    """Deteksi pesan yang isinya cuma nomor (mis '1,2,5', 'no 1 dan 3')."""
+    t = re.sub(
+        r"\b(simpan|masukin|masukkan|no|nomor|mau|ambil|beli|dan|sama|juga|"
+        r"yang|ya|dong|aja|tolong)\b",
+        " ",
+        text.lower(),
+    ).strip()
+    if t and re.fullmatch(r"[\s,\.\-0-9]+", t) and re.search(r"\d", t):
+        return re.findall(r"\d+", t)
+    return []
+
+
 def _variant_lines(p: dict) -> list[str]:
     """Baris ukuran & warna dari data varian produk (kosong kalau tak ada)."""
     v = p.get("variants") or {}
@@ -421,6 +466,23 @@ def _do_add(intent: Intent, user: str):
         for p in products:
             add_to_cart(user, p["id"])
         return [f"Sip, {len(products)} produk aku masukin keranjang! 🛍️", _do_view(user)]
+
+    # multi-pilih: "1,2,5" / "1 2 5" -> masukin beberapa sekaligus
+    nums = re.findall(r"\d+", ref)
+    if len(nums) >= 2:
+        last = get_last_list(user)
+        added = []
+        for n in nums:
+            i = int(n) - 1
+            if 0 <= i < len(last) and last[i] not in added:
+                add_to_cart(user, last[i])
+                added.append(last[i])
+        if not added:
+            return (
+                "Hmm, nomornya nggak ada di daftar 😅 "
+                "Coba lihat daftarnya lagi ya (*kirim ulang katalog*)."
+            )
+        return [f"Sip, {len(added)} produk masuk keranjang! 🛍️", _do_view(user)]
 
     pid = _resolve_product_id(user, intent.product_ref)
     if not pid:
@@ -642,6 +704,10 @@ _QUICK = {
     },
     "view_cart": {"keranjang", "keranjang saya", "cek keranjang", "lihat keranjang"},
     "checkout": {"bayar", "checkout", "pesan sekarang", "pesan"},
+    "resend": {
+        "kirim ulang", "kirim ulang katalog", "kirim ulang katalognya", "katalog",
+        "katalognya", "ulangi", "ulang", "tampilkan lagi", "kirim lagi",
+    },
     "help": {"help", "bantuan", "cara order", "menu"},
 }
 
@@ -664,8 +730,15 @@ def _route(text: str, user: str, history: list[dict]):
         return _do_view(user)
     if quick == "checkout":
         return _do_checkout(user)
+    if quick == "resend":
+        return _do_resend(user)
     if quick == "help":
         return HELP_TEXT
+
+    # fast-path multi-pilih nomor ("1,2,5") -> masukin keranjang
+    nums = _bare_number_refs(text)
+    if nums:
+        return _do_add(Intent(action="add_to_cart", product_ref=",".join(nums)), user)
 
     intent = extract_intent(text, history)
 
@@ -700,9 +773,21 @@ def _route(text: str, user: str, history: list[dict]):
 
 # ---------- entry point ----------
 
-def handle_message(text: str, user: str = "anon") -> list[str]:
-    """Return daftar bubble balasan (bisa >1 pesan untuk dikirim terpisah)."""
+def handle_message(text: str, user: str = "anon", quoted: str = "") -> list[str]:
+    """Return daftar bubble balasan (bisa >1 pesan untuk dikirim terpisah).
+
+    quoted = teks pesan yang di-reply user (kalau ada). Kalau pesan itu berisi
+    produk, jadikan acuan supaya 'no 3'/nama merujuk ke pesan tsb.
+    """
     text = (text or "").strip()
+
+    # konteks reply: produk di pesan yang dibalas jadi acuan terbaru
+    try:
+        qids = _ref_list_from_quoted(quoted)
+        if qids:
+            set_last_list(user, qids)
+    except Exception as exc:
+        print(f"[handle_message] gagal baca quoted: {exc}")
 
     # guard: pesan kosong
     if not text:

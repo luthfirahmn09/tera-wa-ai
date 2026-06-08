@@ -116,10 +116,10 @@ function startQrServer() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function askAI(text, from) {
+async function askAI(text, from, quoted) {
   const { data } = await axios.post(
     `${AI_SERVICE_URL}/chat`,
-    { text, from_: from },
+    { text, from_: from, quoted: quoted || "" },
     { timeout: 30000 }
   );
   // dukung multi-bubble; fallback ke reply tunggal
@@ -170,24 +170,25 @@ const DEBOUNCE_MS = 1200;
 const BUBBLE_GAP_MS = 800;
 const buffers = new Map(); // jid -> { texts:[], timer }
 
-function enqueue(sock, from, text) {
+function enqueue(sock, from, text, quoted) {
   let b = buffers.get(from);
-  if (!b) { b = { texts: [], timer: null }; buffers.set(from, b); }
+  if (!b) { b = { texts: [], timer: null, quoted: "" }; buffers.set(from, b); }
   b.texts.push(text);
+  if (quoted) b.quoted = quoted; // pesan yang di-reply (yang terakhir menang)
   if (b.timer) clearTimeout(b.timer);
   b.timer = setTimeout(() => {
     buffers.delete(from);
-    handleCombined(sock, from, b.texts.join("\n")).catch((e) =>
+    handleCombined(sock, from, b.texts.join("\n"), b.quoted).catch((e) =>
       console.error("handleCombined:", e.message)
     );
   }, DEBOUNCE_MS);
 }
 
-async function handleCombined(sock, from, text) {
+async function handleCombined(sock, from, text, quoted) {
   console.log(`[proses] ${from}: ${text.replace(/\n/g, " | ")}`);
   try {
     await sock.sendPresenceUpdate("composing", from).catch(() => {});
-    const msgs = await askAI(text, from);
+    const msgs = await askAI(text, from, quoted);
     for (let i = 0; i < msgs.length; i++) {
       await sock.sendMessage(from, { text: msgs[i] });
       if (i < msgs.length - 1) {
@@ -210,6 +211,19 @@ function extractText(msg) {
     m.extendedTextMessage?.text ||
     m.imageMessage?.caption ||
     m.videoMessage?.caption ||
+    ""
+  );
+}
+
+// teks pesan yang di-reply user (kalau ada quote)
+function extractQuoted(msg) {
+  const q = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (!q) return "";
+  return (
+    q.conversation ||
+    q.extendedTextMessage?.text ||
+    q.imageMessage?.caption ||
+    q.videoMessage?.caption ||
     ""
   );
 }
@@ -288,8 +302,9 @@ async function startSock() {
       const text = extractText(msg).trim();
       if (!text) continue;
 
-      console.log(`[masuk] ${from}: ${text}`);
-      enqueue(sock, from, text); // debounce + proses gabungan
+      const quoted = extractQuoted(msg);
+      console.log(`[masuk] ${from}: ${text}${quoted ? " (reply)" : ""}`);
+      enqueue(sock, from, text, quoted); // debounce + proses gabungan
     }
   });
 }

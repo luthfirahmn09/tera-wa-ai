@@ -43,6 +43,7 @@ class ChatRequest(BaseModel):
     from_: str | None = None  # nomor pengirim (opsional)
     text: str = ""
     audio_base64: str | None = None  # voice note (OGG) -> ditranskrip dulu
+    quoted: str | None = None  # teks pesan yang di-reply user (kalau ada)
 
 
 class GroqKeyRequest(BaseModel):
@@ -95,7 +96,7 @@ def chat(req: ChatRequest) -> ChatResponse:
             msg = "Maaf, suaranya kurang kebaca 🙏 coba ketik aja ya."
             return ChatResponse(reply=msg, messages=[msg], transcript=None)
 
-    messages = handle_message(text, user=user)
+    messages = handle_message(text, user=user, quoted=req.quoted or "")
     reply = "\n\n".join(messages)
     try:
         logged = f"🎙️ {transcript}" if transcript else req.text
