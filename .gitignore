@@ -1,5 +1,6 @@
 # ===== Dokumentasi / catatan (.md) — di-ignore dulu =====
 *.md
+!README.md
 
 # ===== Secrets / config lokal =====
 .env
